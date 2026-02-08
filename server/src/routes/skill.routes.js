@@ -37,20 +37,69 @@ router.get("/my", protect, async (req, res) => {
 router.get("/profiles/:userId", async (req, res) => {
   try {
     const user = await User.findById(req.params.userId).select(
-      "name role githubUsername",
+      "_id name role githubUsername",
     );
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const claims = await SkillClaim.find({ user: user._id }).sort({
-      createdAt: -1,
-    });
+    const claims = await SkillClaim.find({ user: user._id })
+      .select("_id skill description proofLinks confidence createdAt")
+      .sort({ createdAt: -1 });
+
+    const profile = {
+      user: {
+        _id: user._id,
+        name: user.name,
+        role: user.role,
+        githubUsername: user.githubUsername ?? null,
+      },
+      skills: claims.map((c) => ({
+        _id: c._id,
+        skill: c.skill,
+        description: c.description,
+        proofLinks: c.proofLinks,
+        confidence: c.confidence,
+        createdAt: c.createdAt,
+      })),
+    };
+
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch profile" });
+  }
+});
+
+router.get("/profiles/username/:name", async (req, res) => {
+  try {
+    const user = await User.findOne({
+      name: { $regex: `^${req.params.name}$`, $options: "i" },
+    }).select("_id name role githubUsername");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const claims = await SkillClaim.find({ user: user._id })
+      .select("_id skill description proofLinks confidence createdAt")
+      .sort({ createdAt: -1 });
 
     res.json({
-      user,
-      skills: claims,
+      user: {
+        _id: user._id,
+        name: user.name,
+        role: user.role,
+        githubUsername: user.githubUsername ?? null,
+      },
+      skills: claims.map((c) => ({
+        _id: c._id,
+        skill: c.skill,
+        description: c.description,
+        proofLinks: c.proofLinks,
+        confidence: c.confidence,
+        createdAt: c.createdAt,
+      })),
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch profile" });
