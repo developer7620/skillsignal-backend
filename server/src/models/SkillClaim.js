@@ -20,6 +20,11 @@ const skillClaimSchema = new mongoose.Schema(
       trim: true,
     },
 
+    explanation: {
+      type: Object,
+      default: null,
+    },
+
     proofLinks: {
       type: [String],
       default: [],

@@ -2,6 +2,9 @@ const express = require("express");
 const SkillClaim = require("../models/SkillClaim");
 const User = require("../models/User");
 const protect = require("../middleware/auth.middleware");
+const { calculateSkillScore } = require("../services/scoring.service");
+const GitHubData = require("../models/GitHubData");
+const authMiddleware = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
@@ -103,6 +106,34 @@ router.get("/profiles/username/:name", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch profile" });
+  }
+});
+
+router.post("/:id/evaluate", authMiddleware, async (req, res) => {
+  try {
+    const skillClaim = await SkillClaim.findById(req.params.id);
+
+    if (!skillClaim) {
+      return res.status(404).json({ message: "Skill claim not found" });
+    }
+
+    if (skillClaim.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const githubData = await GitHubData.findOne({ user: req.user.id });
+
+    const result = calculateSkillScore(skillClaim, githubData);
+
+    skillClaim.confidence = result.confidence;
+    skillClaim.explanation = result.signals; // optional but strong
+
+    await skillClaim.save();
+
+    res.json(result);
+  } catch (err) {
+    console.error("EVALUATION ERROR:", err);
+    res.status(500).json({ message: "Skill evaluation failed" });
   }
 });
 
